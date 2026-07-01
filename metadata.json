@@ -1,0 +1,6 @@
+{
+  "name": "Media Tracker Profile Summary",
+  "description": "Busque seu perfil do AniList, Letterboxd ou MyAnimeList e visualize um resumo unificado e análise de personalidade gerada por IA.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
