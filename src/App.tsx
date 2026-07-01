@@ -47,6 +47,15 @@ import {
   SearchState 
 } from "./types";
 
+import { AnilistDetail } from "./components/trackers/AnilistDetail";
+import { LetterboxdDetail } from "./components/trackers/LetterboxdDetail";
+import { MalDetail } from "./components/trackers/MalDetail";
+import { SerializdDetail } from "./components/trackers/SerializdDetail";
+import { TraktDetail } from "./components/trackers/TraktDetail";
+import { LastfmDetail } from "./components/trackers/LastfmDetail";
+import { MydramalistDetail } from "./components/trackers/MydramalistDetail";
+import { SimklDetail } from "./components/trackers/SimklDetail";
+
 // ==========================================
 // HIGH-FIDELITY BRAND LOGO COMPONENT IMPORTS
 // ==========================================
@@ -230,7 +239,6 @@ const categories = [
 export default function App() {
   const [activeSection, setActiveSection] = useState<string>("home");
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
-  const [lastfmTab, setLastfmTab] = useState<"recent" | "loved" | "toptracks" | "topartists" | "recommended">("recent");
 
   // Favorites configuration (eleger fonte favorita por categoria)
   const [favorites, setFavorites] = useState<{ [category: string]: string }>(() => {
@@ -300,15 +308,7 @@ export default function App() {
     mydramalist: MyDramaListUser | null;
     simkl: SimklUser | null;
   }>(() => {
-    try {
-      const saved = localStorage.getItem("tracker_data_cache");
-      if (saved) {
-        return JSON.parse(saved);
-      }
-    } catch (e) {
-      console.error("Error loading tracker_data_cache from localStorage:", e);
-    }
-    return {
+    const defaults = {
       anilist: null,
       letterboxd: null,
       mal: null,
@@ -318,28 +318,22 @@ export default function App() {
       mydramalist: null,
       simkl: null,
     };
+    try {
+      const saved = localStorage.getItem("tracker_data_cache");
+      if (saved) {
+        return { ...defaults, ...JSON.parse(saved) };
+      }
+    } catch (e) {
+      console.error("Error loading tracker_data_cache from localStorage:", e);
+    }
+    return defaults;
   });
 
   // Sincronization statuses
   const [status, setStatus] = useState<{
     [key: string]: { loading: boolean; error: string | null; lastSynced: string | null };
   }>(() => {
-    try {
-      const saved = localStorage.getItem("tracker_status_cache");
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        // Ensure no tracker stays stuck in loading state upon reload
-        Object.keys(parsed).forEach((k) => {
-          if (parsed[k]) {
-            parsed[k].loading = false;
-          }
-        });
-        return parsed;
-      }
-    } catch (e) {
-      console.error("Error loading tracker_status_cache from localStorage:", e);
-    }
-    return {
+    const defaults = {
       anilist: { loading: false, error: null, lastSynced: null },
       letterboxd: { loading: false, error: null, lastSynced: null },
       mal: { loading: false, error: null, lastSynced: null },
@@ -349,6 +343,23 @@ export default function App() {
       mydramalist: { loading: false, error: null, lastSynced: null },
       simkl: { loading: false, error: null, lastSynced: null },
     };
+    try {
+      const saved = localStorage.getItem("tracker_status_cache");
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        const merged = { ...defaults, ...parsed };
+        // Ensure no tracker stays stuck in loading state upon reload
+        Object.keys(merged).forEach((k) => {
+          if (merged[k]) {
+            merged[k].loading = false;
+          }
+        });
+        return merged;
+      }
+    } catch (e) {
+      console.error("Error loading tracker_status_cache from localStorage:", e);
+    }
+    return defaults;
   });
 
   // Save changes to localStorage on updates
@@ -451,7 +462,7 @@ export default function App() {
   const renderConnectOnboarding = (key: keyof typeof trackerMeta) => {
     const meta = trackerMeta[key];
     const trackerConfig = config[key];
-    const trackerStatus = status[key];
+    const trackerStatus = status[key] || { loading: false, error: null, lastSynced: null };
 
     return (
       <motion.div
@@ -544,7 +555,7 @@ export default function App() {
                 ) : (
                   <>
                     <Check className="h-4 w-4" />
-                    Conectar & Sincronizar
+                    Sincronizar Conta
                   </>
                 )}
               </button>
@@ -579,9 +590,8 @@ export default function App() {
             </div>
             <div>
               <h1 className="text-xs font-bold font-display tracking-tight bg-gradient-to-r from-white via-slate-200 to-slate-400 bg-clip-text text-transparent">
-                Media ID
+                Media Profiler
               </h1>
-              <p className="text-[9px] text-slate-500 font-mono tracking-wider uppercase">Profile Tracker</p>
             </div>
           </div>
         </div>
@@ -679,19 +689,19 @@ export default function App() {
                             e.stopPropagation();
                             syncTracker(key);
                           }}
-                          disabled={status[key].loading}
+                          disabled={status[key]?.loading}
                           className="p-1 rounded bg-slate-950 hover:bg-slate-800 text-slate-500 hover:text-slate-300 transition-all border border-slate-900/85 shrink-0"
                           title="Sincronizar Fonte"
                         >
-                          <RefreshCw className={`h-2.5 w-2.5 ${status[key].loading ? "animate-spin" : ""}`} />
+                          <RefreshCw className={`h-2.5 w-2.5 ${status[key]?.loading ? "animate-spin" : ""}`} />
                         </button>
                         <span className="text-[8px] font-mono font-bold bg-emerald-500/10 text-emerald-400 px-1 py-0.5 rounded border border-emerald-500/20 uppercase tracking-wider">
-                          Ativo
+                          Sincronizado
                         </span>
                       </div>
                     ) : (
                       <span className="text-[8px] font-mono font-bold bg-slate-950 text-slate-600 px-1 py-0.5 rounded border border-slate-900 uppercase tracking-wider">
-                        Conectar
+                        Sincronizar
                       </span>
                     )}
                   </div>
@@ -740,9 +750,9 @@ export default function App() {
                     <Database className="h-6 w-6" />
                   </div>
                   <div className="space-y-1.5">
-                    <h3 className="text-lg font-bold">Nenhuma rede conectada</h3>
+                    <h3 className="text-lg font-bold">Nenhuma rede sincronizada</h3>
                     <p className="text-xs text-slate-400 max-w-md mx-auto">
-                      Para começar a consolidar seu histórico de mídias, conecte pelo menos um tracker (como AniList ou Letterboxd) inserindo seu apelido público.
+                      Para começar a consolidar seu histórico de mídias, sincronize pelo menos um tracker (como AniList ou Letterboxd) inserindo seu apelido público.
                     </p>
                   </div>
                   <button
@@ -773,10 +783,10 @@ export default function App() {
                         <button
                           key={cat.id}
                           onClick={() => setSelectedCategory(cat.id)}
-                          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold tracking-wide transition-all duration-200 border ${
+                          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold tracking-wide transition-all duration-200 border border-slate-900 ${
                             isActive
-                              ? "bg-rose-500/10 text-rose-400 border-rose-500/30 shadow-md shadow-rose-500/5"
-                              : "bg-slate-950/40 text-slate-400 border-slate-900 hover:text-slate-200 hover:bg-slate-900/30"
+                              ? "bg-rose-500/10 text-rose-400 !border-rose-500/30 shadow-md shadow-rose-500/5"
+                              : "bg-slate-950/40 text-slate-400 hover:text-slate-200 hover:bg-slate-900/30"
                           }`}
                         >
                           {cat.icon}
@@ -792,7 +802,7 @@ export default function App() {
                       Visão Geral das Plataformas
                     </h3>
                     <span className="text-[10px] text-slate-500 font-mono">
-                      {activeAndLoaded.length} trackers conectados
+                      {activeAndLoaded.length} trackers sincronizados
                     </span>
                   </div>
 
@@ -801,8 +811,8 @@ export default function App() {
                     {config.anilist.enabled && data.anilist && (selectedCategory === "all" || selectedCategory === "animes") && (() => {
                       const isFav = favorites["Animes"] === "anilist";
                       return (
-                        <div className={`bg-[#0c0f13]/60 border p-5 rounded-2xl flex flex-col justify-between hover:border-slate-800 transition-all shadow-lg group ${
-                          isFav ? "border-amber-500/40 shadow-amber-500/5 shadow-md" : "border-slate-900"
+                        <div className={`bg-[#0c0f13]/60 border border-slate-900 p-5 rounded-2xl flex flex-col justify-between hover:border-slate-800 transition-all shadow-lg group ${
+                          isFav ? "!border-amber-500/40 shadow-amber-500/5 shadow-md" : ""
                         }`}>
                           <div className="flex items-start justify-between gap-4">
                             <div className="flex items-center gap-3">
@@ -814,7 +824,7 @@ export default function App() {
                               <div>
                                 <h4 className="font-bold text-sm text-slate-200">{data.anilist.name}</h4>
                                 <div className="flex items-center gap-1.5 mt-0.5">
-                                  <p className="text-[10px] text-sky-400 font-mono">AniList Conectado</p>
+                                  <p className="text-[10px] text-sky-400 font-mono">AniList Sincronizado</p>
                                   {isFav && (
                                     <span className="flex items-center gap-0.5 bg-amber-500/10 text-amber-400 border border-amber-500/20 px-1 py-0.5 rounded text-[8px] font-mono font-bold uppercase tracking-wider">
                                       ★ Favorito
@@ -862,8 +872,8 @@ export default function App() {
                     {config.letterboxd.enabled && data.letterboxd && (selectedCategory === "all" || selectedCategory === "filmes") && (() => {
                       const isFav = favorites["Filmes"] === "letterboxd";
                       return (
-                        <div className={`bg-[#0c0f13]/60 border p-5 rounded-2xl flex flex-col justify-between hover:border-slate-800 transition-all shadow-lg group ${
-                          isFav ? "border-amber-500/40 shadow-amber-500/5 shadow-md" : "border-slate-900"
+                        <div className={`bg-[#0c0f13]/60 border border-slate-900 p-5 rounded-2xl flex flex-col justify-between hover:border-slate-800 transition-all shadow-lg group ${
+                          isFav ? "!border-amber-500/40 shadow-amber-500/5 shadow-md" : ""
                         }`}>
                           <div className="flex items-start justify-between gap-4">
                             <div className="flex items-center gap-3">
@@ -873,7 +883,7 @@ export default function App() {
                               <div>
                                 <h4 className="font-bold text-sm text-slate-200">{data.letterboxd.displayName}</h4>
                                 <div className="flex items-center gap-1.5 mt-0.5">
-                                  <p className="text-[10px] text-orange-400 font-mono">Letterboxd Conectado</p>
+                                  <p className="text-[10px] text-orange-400 font-mono">Letterboxd Sincronizado</p>
                                   {isFav && (
                                     <span className="flex items-center gap-0.5 bg-amber-500/10 text-amber-400 border border-amber-500/20 px-1 py-0.5 rounded text-[8px] font-mono font-bold uppercase tracking-wider">
                                       ★ Favorito
@@ -917,8 +927,8 @@ export default function App() {
                     {config.mal.enabled && data.mal && (selectedCategory === "all" || selectedCategory === "animes") && (() => {
                       const isFav = favorites["Animes"] === "mal";
                       return (
-                        <div className={`bg-[#0c0f13]/60 border p-5 rounded-2xl flex flex-col justify-between hover:border-slate-800 transition-all shadow-lg group ${
-                          isFav ? "border-amber-500/40 shadow-amber-500/5 shadow-md" : "border-slate-900"
+                        <div className={`bg-[#0c0f13]/60 border border-slate-900 p-5 rounded-2xl flex flex-col justify-between hover:border-slate-800 transition-all shadow-lg group ${
+                          isFav ? "!border-amber-500/40 shadow-amber-500/5 shadow-md" : ""
                         }`}>
                           <div className="flex items-start justify-between gap-4">
                             <div className="flex items-center gap-3">
@@ -936,7 +946,7 @@ export default function App() {
                               <div>
                                 <h4 className="font-bold text-sm text-slate-200">{data.mal.username}</h4>
                                 <div className="flex items-center gap-1.5 mt-0.5">
-                                  <p className="text-[10px] text-blue-400 font-mono">MyAnimeList Conectado</p>
+                                  <p className="text-[10px] text-blue-400 font-mono">MyAnimeList Sincronizado</p>
                                   {isFav && (
                                     <span className="flex items-center gap-0.5 bg-amber-500/10 text-amber-400 border border-amber-500/20 px-1 py-0.5 rounded text-[8px] font-mono font-bold uppercase tracking-wider">
                                       ★ Favorito
@@ -984,8 +994,8 @@ export default function App() {
                     {config.serializd.enabled && data.serializd && (selectedCategory === "all" || selectedCategory === "series") && (() => {
                       const isFav = favorites["Séries"] === "serializd";
                       return (
-                        <div className={`bg-[#0c0f13]/60 border p-5 rounded-2xl flex flex-col justify-between hover:border-slate-800 transition-all shadow-lg group ${
-                          isFav ? "border-amber-500/40 shadow-amber-500/5 shadow-md" : "border-slate-900"
+                        <div className={`bg-[#0c0f13]/60 border border-slate-900 p-5 rounded-2xl flex flex-col justify-between hover:border-slate-800 transition-all shadow-lg group ${
+                          isFav ? "!border-amber-500/40 shadow-amber-500/5 shadow-md" : ""
                         }`}>
                           <div className="flex items-start justify-between gap-4">
                             <div className="flex items-center gap-3">
@@ -1003,7 +1013,7 @@ export default function App() {
                               <div>
                                 <h4 className="font-bold text-sm text-slate-200">{data.serializd.username}</h4>
                                 <div className="flex items-center gap-1.5 mt-0.5">
-                                  <p className="text-[10px] text-teal-400 font-mono">Serializd Conectado</p>
+                                  <p className="text-[10px] text-teal-400 font-mono">Serializd Sincronizado</p>
                                   {isFav && (
                                     <span className="flex items-center gap-0.5 bg-amber-500/10 text-amber-400 border border-amber-500/20 px-1 py-0.5 rounded text-[8px] font-mono font-bold uppercase tracking-wider">
                                       ★ Favorito
@@ -1051,8 +1061,8 @@ export default function App() {
                     {config.trakt.enabled && data.trakt && (selectedCategory === "all" || selectedCategory === "series" || selectedCategory === "filmes") && (() => {
                       const isFav = favorites["Séries"] === "trakt";
                       return (
-                        <div className={`bg-[#0c0f13]/60 border p-5 rounded-2xl flex flex-col justify-between hover:border-slate-800 transition-all shadow-lg group ${
-                          isFav ? "border-amber-500/40 shadow-amber-500/5 shadow-md" : "border-slate-900"
+                        <div className={`bg-[#0c0f13]/60 border border-slate-900 p-5 rounded-2xl flex flex-col justify-between hover:border-slate-800 transition-all shadow-lg group ${
+                          isFav ? "!border-amber-500/40 shadow-amber-500/5 shadow-md" : ""
                         }`}>
                           <div className="flex items-start justify-between gap-4">
                             <div className="flex items-center gap-3">
@@ -1062,7 +1072,7 @@ export default function App() {
                               <div>
                                 <h4 className="font-bold text-sm text-slate-200">{data.trakt.username}</h4>
                                 <div className="flex items-center gap-1.5 mt-0.5">
-                                  <p className="text-[10px] text-rose-400 font-mono">Trakt.tv Conectado</p>
+                                  <p className="text-[10px] text-rose-400 font-mono">Trakt.tv Sincronizado</p>
                                   {isFav && (
                                     <span className="flex items-center gap-0.5 bg-amber-500/10 text-amber-400 border border-amber-500/20 px-1 py-0.5 rounded text-[8px] font-mono font-bold uppercase tracking-wider">
                                       ★ Favorito
@@ -1106,8 +1116,8 @@ export default function App() {
                     {config.lastfm.enabled && data.lastfm && (selectedCategory === "all" || selectedCategory === "musicas") && (() => {
                       const isFav = favorites["Músicas"] === "lastfm";
                       return (
-                        <div className={`bg-[#0c0f13]/60 border p-5 rounded-2xl flex flex-col justify-between hover:border-slate-800 transition-all shadow-lg group ${
-                          isFav ? "border-amber-500/40 shadow-amber-500/5 shadow-md" : "border-slate-900"
+                        <div className={`bg-[#0c0f13]/60 border border-slate-900 p-5 rounded-2xl flex flex-col justify-between hover:border-slate-800 transition-all shadow-lg group ${
+                          isFav ? "!border-amber-500/40 shadow-amber-500/5 shadow-md" : ""
                         }`}>
                           <div className="flex items-start justify-between gap-4">
                             <div className="flex items-center gap-3">
@@ -1117,7 +1127,7 @@ export default function App() {
                               <div>
                                 <h4 className="font-bold text-sm text-slate-200">{data.lastfm.username}</h4>
                                 <div className="flex items-center gap-1.5 mt-0.5">
-                                  <p className="text-[10px] text-red-400 font-mono">Last.fm Conectado</p>
+                                  <p className="text-[10px] text-red-400 font-mono">Last.fm Sincronizado</p>
                                   {isFav && (
                                     <span className="flex items-center gap-0.5 bg-amber-500/10 text-amber-400 border border-amber-500/20 px-1 py-0.5 rounded text-[8px] font-mono font-bold uppercase tracking-wider">
                                       ★ Favorito
@@ -1161,8 +1171,8 @@ export default function App() {
                     {config.mydramalist.enabled && data.mydramalist && (selectedCategory === "all" || selectedCategory === "doramas") && (() => {
                       const isFav = favorites["Doramas"] === "mydramalist";
                       return (
-                        <div className={`bg-[#0c0f13]/60 border p-5 rounded-2xl flex flex-col justify-between hover:border-slate-800 transition-all shadow-lg group ${
-                          isFav ? "border-amber-500/40 shadow-amber-500/5 shadow-md" : "border-slate-900"
+                        <div className={`bg-[#0c0f13]/60 border border-slate-900 p-5 rounded-2xl flex flex-col justify-between hover:border-slate-800 transition-all shadow-lg group ${
+                          isFav ? "!border-amber-500/40 shadow-amber-500/5 shadow-md" : ""
                         }`}>
                           <div className="flex items-start justify-between gap-4">
                             <div className="flex items-center gap-3">
@@ -1180,7 +1190,7 @@ export default function App() {
                               <div>
                                 <h4 className="font-bold text-sm text-slate-200">{data.mydramalist.displayName}</h4>
                                 <div className="flex items-center gap-1.5 mt-0.5">
-                                  <p className="text-[10px] text-blue-400 font-mono">MyDramaList Conectado</p>
+                                  <p className="text-[10px] text-blue-400 font-mono">MyDramaList Sincronizado</p>
                                   {isFav && (
                                     <span className="flex items-center gap-0.5 bg-amber-500/10 text-amber-400 border border-amber-500/20 px-1 py-0.5 rounded text-[8px] font-mono font-bold uppercase tracking-wider">
                                       ★ Favorito
@@ -1228,8 +1238,8 @@ export default function App() {
                     {config.simkl.enabled && data.simkl && (selectedCategory === "all" || selectedCategory === "animes" || selectedCategory === "filmes" || selectedCategory === "series") && (() => {
                       const isFav = favorites["Filmes"] === "simkl" || favorites["Séries"] === "simkl" || favorites["Animes"] === "simkl";
                       return (
-                        <div className={`bg-[#0c0f13]/60 border p-5 rounded-2xl flex flex-col justify-between hover:border-slate-800 transition-all shadow-lg group ${
-                          isFav ? "border-amber-500/40 shadow-amber-500/5 shadow-md" : "border-slate-900"
+                        <div className={`bg-[#0c0f13]/60 border border-slate-900 p-5 rounded-2xl flex flex-col justify-between hover:border-slate-800 transition-all shadow-lg group ${
+                          isFav ? "!border-amber-500/40 shadow-amber-500/5 shadow-md" : ""
                         }`}>
                           <div className="flex items-start justify-between gap-4">
                             <div className="flex items-center gap-3">
@@ -1247,7 +1257,7 @@ export default function App() {
                               <div>
                                 <h4 className="font-bold text-sm text-slate-200">{data.simkl.displayName}</h4>
                                 <div className="flex items-center gap-1.5 mt-0.5">
-                                  <p className="text-[10px] text-yellow-400 font-mono">Simkl Conectado</p>
+                                  <p className="text-[10px] text-yellow-400 font-mono">Simkl Sincronizado</p>
                                   {isFav && (
                                     <span className="flex items-center gap-0.5 bg-amber-500/10 text-amber-400 border border-amber-500/20 px-1 py-0.5 rounded text-[8px] font-mono font-bold uppercase tracking-wider">
                                       ★ Favorito
@@ -1304,7 +1314,7 @@ export default function App() {
                         <div className="space-y-1">
                           <h4 className="font-bold text-sm text-slate-200">Nenhum rastreador de Animes</h4>
                           <p className="text-xs text-slate-400 leading-relaxed">
-                            Conecte sua conta do AniList, MyAnimeList ou Simkl nas configurações para exibir suas estatísticas, conquistas e episódios de animes.
+                            Sincronize sua conta do AniList, MyAnimeList ou Simkl nas configurações para exibir suas estatísticas, conquistas e episódios de animes.
                           </p>
                         </div>
                         <button
@@ -1324,7 +1334,7 @@ export default function App() {
                         <div className="space-y-1">
                           <h4 className="font-bold text-sm text-slate-200">Nenhum rastreador de Filmes</h4>
                           <p className="text-xs text-slate-400 leading-relaxed">
-                            Conecte seu Letterboxd, Trakt.tv ou Simkl nas configurações para começar a monitorar seus diários de filmes e resenhas de cinema.
+                            Sincronize seu Letterboxd, Trakt.tv ou Simkl nas configurações para começar a monitorar seus diários de filmes e resenhas de cinema.
                           </p>
                         </div>
                         <button
@@ -1344,7 +1354,7 @@ export default function App() {
                         <div className="space-y-1">
                           <h4 className="font-bold text-sm text-slate-200">Nenhum rastreador de Séries</h4>
                           <p className="text-xs text-slate-400 leading-relaxed">
-                            Conecte seu Serializd, Trakt.tv ou Simkl nas configurações para carregar sua atividade diária de maratona de séries e episódios de TV.
+                            Sincronize seu Serializd, Trakt.tv ou Simkl nas configurações para carregar sua atividade diária de maratona de séries e episódios de TV.
                           </p>
                         </div>
                         <button
@@ -1364,7 +1374,7 @@ export default function App() {
                         <div className="space-y-1">
                           <h4 className="font-bold text-sm text-slate-200">Nenhum rastreador de Doramas</h4>
                           <p className="text-xs text-slate-400 leading-relaxed">
-                            Conecte seu MyDramaList nas configurações para monitorar seus dramas asiáticos assistidos, watchlist e progresso de episódios.
+                            Sincronize seu MyDramaList nas configurações para monitorar seus dramas asiáticos assistidos, watchlist e progresso de episódios.
                           </p>
                         </div>
                         <button
@@ -1384,7 +1394,7 @@ export default function App() {
                         <div className="space-y-1">
                           <h4 className="font-bold text-sm text-slate-200">Nenhum rastreador de Músicas</h4>
                           <p className="text-xs text-slate-400 leading-relaxed">
-                            Conecte seu Last.fm nas configurações para começar a monitorar suas músicas ouvidas, scrobbles e artistas favoritos no painel.
+                            Sincronize seu Last.fm nas configurações para começar a monitorar suas músicas ouvidas, scrobbles e artistas favoritos no painel.
                           </p>
                         </div>
                         <button
@@ -1417,10 +1427,10 @@ export default function App() {
               <div className="space-y-1">
                 <h2 className="text-xl sm:text-2xl font-black font-display tracking-tight text-white flex items-center gap-2">
                   <Settings className="h-6 w-6 text-rose-500" />
-                  Gerenciar Conexões
+                  Gerenciar Sincronizações
                 </h2>
                 <p className="text-xs text-slate-400">
-                  Insira seus nicknames e ative/desative cada rede social. Lembre-se que seus perfis precisam estar configurados como públicos nas respectivas plataformas.
+                  Insira seus nicknames e gerencie a sincronização de cada rede social. Lembre-se que seus perfis precisam estar configurados como públicos nas respectivas plataformas.
                 </p>
               </div>
 
@@ -1485,16 +1495,16 @@ export default function App() {
                 {(Object.keys(config) as Array<keyof typeof config>).map((key) => {
                   const meta = trackerMeta[key];
                   const trackerConfig = config[key];
-                  const trackerStatus = status[key];
+                  const trackerStatus = status[key] || { loading: false, error: null, lastSynced: null };
                   const hasNick = trackerConfig.nickname.trim().length > 0;
 
                   return (
                     <div 
                       key={key} 
-                      className={`bg-[#0c0f13]/80 border rounded-2xl p-5 sm:p-6 transition-all ${
+                      className={`bg-[#0c0f13]/80 border border-slate-900/60 rounded-2xl p-5 sm:p-6 transition-all ${
                         trackerConfig.enabled 
-                          ? "border-slate-800" 
-                          : "border-slate-900/60 opacity-60"
+                          ? "!border-slate-800" 
+                          : "opacity-60"
                       }`}
                     >
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-5 pb-4 border-b border-slate-900/80">
@@ -1518,7 +1528,7 @@ export default function App() {
                         {/* Active Toggle Switch */}
                         <div className="flex items-center gap-2.5">
                           <span className="text-[11px] font-semibold text-slate-400">
-                            {trackerConfig.enabled ? "Ativo" : "Inativo"}
+                            {trackerConfig.enabled ? "Sincronizado" : "Pausado"}
                           </span>
                           <button
                             onClick={() => handleConfigToggle(key)}
@@ -1665,314 +1675,7 @@ export default function App() {
               ========================================== */}
           {activeSection === "anilist" && (
             data.anilist ? (
-              <motion.div
-                key="anilist"
-                initial={{ opacity: 0, y: 15 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -15 }}
-                className="max-w-5xl mx-auto space-y-6"
-              >
-                {/* Banner Profile Cover */}
-                <div className="bg-[#0c0f13] border border-slate-900 rounded-2xl overflow-hidden shadow-xl">
-                  <div className="h-44 bg-slate-950 relative overflow-hidden">
-                    {data.anilist.bannerImage ? (
-                      <img 
-                        src={data.anilist.bannerImage} 
-                        alt="banner" 
-                        className="w-full h-full object-cover opacity-50"
-                      />
-                    ) : (
-                      <div className="w-full h-full bg-gradient-to-r from-sky-950 to-indigo-950" />
-                    )}
-                    <div className="absolute inset-0 bg-gradient-to-t from-[#0c0f13] to-transparent" />
-                    
-                    {/* User Avatar Info overlap */}
-                    <div className="absolute bottom-5 left-6 flex items-center gap-4">
-                      <img 
-                        src={data.anilist.avatar?.large} 
-                        alt="avatar" 
-                        className="h-16 w-16 rounded-xl border-2 border-sky-400 object-cover bg-slate-900 shadow-lg"
-                      />
-                      <div>
-                        <h3 className="text-xl font-bold font-display text-white">{data.anilist.name}</h3>
-                        <p className="text-xs text-sky-400 font-mono">Anime & Manga Tracker</p>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="p-6 space-y-6">
-                    {/* General Stats row */}
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                      <div className="bg-[#06080a]/80 border border-slate-900/60 p-4 rounded-xl text-center">
-                        <span className="text-[10px] text-slate-500 font-mono block mb-1">Tempo Assistindo</span>
-                        <strong className="text-sm font-bold text-sky-400">{formatWatchTime(data.anilist.stats?.watchedTime || 0)}</strong>
-                      </div>
-                      <div className="bg-[#06080a]/80 border border-slate-900/60 p-4 rounded-xl text-center">
-                        <span className="text-[10px] text-slate-500 font-mono block mb-1">Capítulos Lidos</span>
-                        <strong className="text-sm font-bold text-sky-400">{data.anilist.stats?.chaptersRead || 0}</strong>
-                      </div>
-                      <div className="bg-[#06080a]/80 border border-slate-900/60 p-4 rounded-xl text-center">
-                        <span className="text-[10px] text-slate-500 font-mono block mb-1">Nota Média</span>
-                        <strong className="text-sm font-bold text-sky-400">
-                          {data.anilist.stats?.animeListScores?.meanScore ? `${data.anilist.stats.animeListScores.meanScore}/100` : "N/A"}
-                        </strong>
-                      </div>
-                      <div className="bg-[#06080a]/80 border border-slate-900/60 p-4 rounded-xl text-center">
-                        <span className="text-[10px] text-slate-500 font-mono block mb-1">Desvio Padrão</span>
-                        <strong className="text-sm font-bold text-sky-400">
-                          {data.anilist.stats?.animeListScores?.standardDeviation ? data.anilist.stats.animeListScores.standardDeviation : "N/A"}
-                        </strong>
-                      </div>
-                    </div>
-
-                    {/* Detailed API Statistics Block */}
-                    {data.anilist.statistics && (
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-[#06080a]/30 border border-slate-900/40 p-5 rounded-2xl">
-                        {/* Anime Statistics Section */}
-                        {data.anilist.statistics.anime && (
-                          <div className="space-y-4">
-                            <h4 className="text-xs font-mono font-bold text-sky-400 uppercase tracking-wider flex items-center gap-2">
-                              <Tv className="h-4 w-4" />
-                              Estatísticas de Anime
-                            </h4>
-                            
-                            <div className="grid grid-cols-3 gap-2">
-                              <div className="bg-[#0c0f13]/80 p-2.5 rounded-lg border border-slate-900/40 text-center">
-                                <span className="text-[9px] text-slate-500 block">Total</span>
-                                <strong className="text-xs font-bold text-white">{data.anilist.statistics.anime.count}</strong>
-                              </div>
-                              <div className="bg-[#0c0f13]/80 p-2.5 rounded-lg border border-slate-900/40 text-center">
-                                <span className="text-[9px] text-slate-500 block">Episódios</span>
-                                <strong className="text-xs font-bold text-white">{data.anilist.statistics.anime.episodesWatched}</strong>
-                              </div>
-                              <div className="bg-[#0c0f13]/80 p-2.5 rounded-lg border border-slate-900/40 text-center">
-                                <span className="text-[9px] text-slate-500 block">Nota Média</span>
-                                <strong className="text-xs font-bold text-white">
-                                  {data.anilist.statistics.anime.meanScore ? `${data.anilist.statistics.anime.meanScore}/100` : "N/A"}
-                                </strong>
-                              </div>
-                            </div>
-
-                            {/* Statuses distribution */}
-                            {data.anilist.statistics.anime.statuses && data.anilist.statistics.anime.statuses.length > 0 && (
-                              <div className="space-y-2">
-                                <span className="text-[10px] text-slate-400 font-mono block">Distribuição por Status</span>
-                                <div className="space-y-1.5">
-                                  {data.anilist.statistics.anime.statuses.slice(0, 4).map((st) => {
-                                    const percentage = data.anilist.statistics.anime!.count 
-                                      ? Math.round((st.count / data.anilist.statistics.anime!.count) * 100) 
-                                      : 0;
-                                    
-                                    const statusLabels: Record<string, string> = {
-                                      COMPLETED: "Completo",
-                                      PLANNING: "Planejando",
-                                      CURRENT: "Assistindo",
-                                      PAUSED: "Pausado",
-                                      DROPPED: "Abandonado",
-                                      REPEATING: "Revendo"
-                                    };
-
-                                    const statusColors: Record<string, string> = {
-                                      COMPLETED: "bg-emerald-500",
-                                      PLANNING: "bg-sky-500",
-                                      CURRENT: "bg-purple-500",
-                                      PAUSED: "bg-amber-500",
-                                      DROPPED: "bg-rose-500",
-                                      REPEATING: "bg-indigo-500"
-                                    };
-
-                                    return (
-                                      <div key={st.status} className="text-[11px]">
-                                        <div className="flex justify-between text-[10px] text-slate-400 mb-0.5">
-                                          <span>{statusLabels[st.status] || st.status}</span>
-                                          <span className="font-mono">{st.count} ({percentage}%)</span>
-                                        </div>
-                                        <div className="w-full h-1.5 bg-slate-950 rounded-full overflow-hidden">
-                                          <div className={`h-full ${statusColors[st.status] || "bg-slate-500"}`} style={{ width: `${percentage}%` }} />
-                                        </div>
-                                      </div>
-                                    );
-                                  })}
-                                </div>
-                              </div>
-                            )}
-
-                            {/* Genres distribution */}
-                            {data.anilist.statistics.anime.genres && data.anilist.statistics.anime.genres.length > 0 && (
-                              <div className="space-y-2">
-                                <span className="text-[10px] text-slate-400 font-mono block">Gêneros Favoritos</span>
-                                <div className="flex flex-wrap gap-1.5">
-                                  {data.anilist.statistics.anime.genres.slice(0, 5).map((g) => (
-                                    <span key={g.genre} className="text-[10px] bg-sky-500/5 text-sky-400 border border-sky-500/10 px-2.5 py-0.5 rounded-full font-sans">
-                                      {g.genre} <strong className="text-slate-500 font-mono ml-0.5">{g.count}</strong>
-                                    </span>
-                                  ))}
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        )}
-
-                        {/* Manga Statistics Section */}
-                        {data.anilist.statistics.manga && (
-                          <div className="space-y-4">
-                            <h4 className="text-xs font-mono font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-2">
-                              <BookOpen className="h-4 w-4" />
-                              Estatísticas de Mangá
-                            </h4>
-                            
-                            <div className="grid grid-cols-3 gap-2">
-                              <div className="bg-[#0c0f13]/80 p-2.5 rounded-lg border border-slate-900/40 text-center">
-                                <span className="text-[9px] text-slate-500 block">Total</span>
-                                <strong className="text-xs font-bold text-white">{data.anilist.statistics.manga.count}</strong>
-                              </div>
-                              <div className="bg-[#0c0f13]/80 p-2.5 rounded-lg border border-slate-900/40 text-center">
-                                <span className="text-[9px] text-slate-500 block">Vols Lidos</span>
-                                <strong className="text-xs font-bold text-white">{data.anilist.statistics.manga.volumesRead}</strong>
-                              </div>
-                              <div className="bg-[#0c0f13]/80 p-2.5 rounded-lg border border-slate-900/40 text-center">
-                                <span className="text-[9px] text-slate-500 block">Nota Média</span>
-                                <strong className="text-xs font-bold text-white">
-                                  {data.anilist.statistics.manga.meanScore ? `${data.anilist.statistics.manga.meanScore}/100` : "N/A"}
-                                </strong>
-                              </div>
-                            </div>
-
-                            {/* Statuses distribution */}
-                            {data.anilist.statistics.manga.statuses && data.anilist.statistics.manga.statuses.length > 0 && (
-                              <div className="space-y-2">
-                                <span className="text-[10px] text-slate-400 font-mono block">Distribuição por Status</span>
-                                <div className="space-y-1.5">
-                                  {data.anilist.statistics.manga.statuses.slice(0, 4).map((st) => {
-                                    const percentage = data.anilist.statistics.manga!.count 
-                                      ? Math.round((st.count / data.anilist.statistics.manga!.count) * 100) 
-                                      : 0;
-                                    
-                                    const statusLabels: Record<string, string> = {
-                                      COMPLETED: "Completo",
-                                      PLANNING: "Planejando",
-                                      CURRENT: "Lendo",
-                                      PAUSED: "Pausado",
-                                      DROPPED: "Abandonado",
-                                      REPEATING: "Relendo"
-                                    };
-
-                                    const statusColors: Record<string, string> = {
-                                      COMPLETED: "bg-emerald-500",
-                                      PLANNING: "bg-sky-500",
-                                      CURRENT: "bg-purple-500",
-                                      PAUSED: "bg-amber-500",
-                                      DROPPED: "bg-rose-500",
-                                      REPEATING: "bg-indigo-500"
-                                    };
-
-                                    return (
-                                      <div key={st.status} className="text-[11px]">
-                                        <div className="flex justify-between text-[10px] text-slate-400 mb-0.5">
-                                          <span>{statusLabels[st.status] || st.status}</span>
-                                          <span className="font-mono">{st.count} ({percentage}%)</span>
-                                        </div>
-                                        <div className="w-full h-1.5 bg-slate-950 rounded-full overflow-hidden">
-                                          <div className={`h-full ${statusColors[st.status] || "bg-slate-500"}`} style={{ width: `${percentage}%` }} />
-                                        </div>
-                                      </div>
-                                    );
-                                  })}
-                                </div>
-                              </div>
-                            )}
-
-                            {/* Genres distribution */}
-                            {data.anilist.statistics.manga.genres && data.anilist.statistics.manga.genres.length > 0 && (
-                              <div className="space-y-2">
-                                <span className="text-[10px] text-slate-400 font-mono block">Gêneros Favoritos</span>
-                                <div className="flex flex-wrap gap-1.5">
-                                  {data.anilist.statistics.manga.genres.slice(0, 5).map((g) => (
-                                    <span key={g.genre} className="text-[10px] bg-emerald-500/5 text-emerald-400 border border-emerald-500/10 px-2.5 py-0.5 rounded-full font-sans">
-                                      {g.genre} <strong className="text-slate-500 font-mono ml-0.5">{g.count}</strong>
-                                    </span>
-                                  ))}
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    {/* Favorites Lists */}
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                      {/* Favorite Anime */}
-                      <div className="space-y-3">
-                        <h4 className="text-xs font-mono font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
-                          <Heart className="h-4 w-4 text-rose-500 animate-pulse" />
-                          Animes Favoritos ({data.anilist.favourites?.anime?.nodes?.length || 0})
-                        </h4>
-                        {data.anilist.favourites?.anime?.nodes?.length ? (
-                          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                            {data.anilist.favourites.anime.nodes.slice(0, 6).map((node) => (
-                              <div key={node.id} className="bg-[#06080a] border border-slate-900 rounded-xl overflow-hidden hover:border-slate-800 transition-all group">
-                                <div className="h-28 bg-slate-900 overflow-hidden relative">
-                                  <img 
-                                    src={node.coverImage?.large} 
-                                    alt={node.title.english || node.title.romaji} 
-                                    referrerPolicy="no-referrer"
-                                    className="w-full h-full object-cover group-hover:scale-105 transition-all"
-                                  />
-                                </div>
-                                <div className="p-2">
-                                  <p className="text-xs font-bold text-slate-200 line-clamp-1">
-                                    {node.title.english || node.title.romaji}
-                                  </p>
-                                  <p className="text-[10px] text-slate-500 truncate mt-0.5">
-                                    {node.genres?.slice(0, 2).join(", ")}
-                                  </p>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        ) : (
-                          <p className="text-xs text-slate-500 italic">Nenhum anime favoritado.</p>
-                        )}
-                      </div>
-
-                      {/* Favorite Manga */}
-                      <div className="space-y-3">
-                        <h4 className="text-xs font-mono font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
-                          <BookOpen className="h-4 w-4 text-emerald-400" />
-                          Mangás Favoritos ({data.anilist.favourites?.manga?.nodes?.length || 0})
-                        </h4>
-                        {data.anilist.favourites?.manga?.nodes?.length ? (
-                          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                            {data.anilist.favourites.manga.nodes.slice(0, 6).map((node) => (
-                              <div key={node.id} className="bg-[#06080a] border border-slate-900 rounded-xl overflow-hidden hover:border-slate-800 transition-all group">
-                                <div className="h-28 bg-slate-900 overflow-hidden relative">
-                                  <img 
-                                    src={node.coverImage?.large} 
-                                    alt={node.title.english || node.title.romaji} 
-                                    referrerPolicy="no-referrer"
-                                    className="w-full h-full object-cover group-hover:scale-105 transition-all"
-                                  />
-                                </div>
-                                <div className="p-2">
-                                  <p className="text-xs font-bold text-slate-200 line-clamp-1">
-                                    {node.title.english || node.title.romaji}
-                                  </p>
-                                  <p className="text-[10px] text-slate-500 truncate mt-0.5">
-                                    {node.genres?.slice(0, 2).join(", ")}
-                                  </p>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        ) : (
-                          <p className="text-xs text-slate-500 italic">Nenhum mangá favoritado.</p>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </motion.div>
+              <AnilistDetail data={data.anilist} />
             ) : (
               renderConnectOnboarding("anilist")
             )
@@ -1983,180 +1686,7 @@ export default function App() {
               ========================================== */}
           {activeSection === "letterboxd" && (
             data.letterboxd ? (
-              <motion.div
-                key="letterboxd"
-                initial={{ opacity: 0, y: 15 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -15 }}
-                className="max-w-5xl mx-auto space-y-6"
-              >
-                <div className="bg-[#0c0f13] border border-slate-900 rounded-2xl overflow-hidden shadow-xl">
-                  {/* Header Banner */}
-                  <div className="p-6 bg-gradient-to-r from-orange-950/20 to-slate-900/60 border-b border-slate-900 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                    <div className="flex items-start gap-4">
-                      {data.letterboxd.avatar ? (
-                        <img 
-                          src={data.letterboxd.avatar} 
-                          alt={data.letterboxd.displayName} 
-                          className="h-16 w-14 rounded-2xl object-cover border border-orange-500/20 shadow-md shrink-0"
-                          referrerPolicy="no-referrer"
-                        />
-                      ) : (
-                        <div className="h-14 w-14 rounded-2xl bg-orange-600 text-white font-black font-display flex items-center justify-center text-xl shadow-lg shrink-0">
-                          {data.letterboxd.username.substring(0, 2).toUpperCase()}
-                        </div>
-                      )}
-                      <div className="space-y-1">
-                        <h3 className="text-xl font-bold text-white flex items-center gap-2">
-                          {data.letterboxd.displayName}
-                          <span className="text-xs font-mono font-normal text-slate-500">@{data.letterboxd.username}</span>
-                        </h3>
-                        <p className="text-xs text-orange-400 font-mono">
-                          Perfil Letterboxd • <a href={data.letterboxd.profileUrl} target="_blank" rel="noreferrer" className="underline inline-flex items-center gap-1 hover:text-orange-300">Letterboxd.com <ExternalLink className="h-3 w-3" /></a>
-                        </p>
-                        {data.letterboxd.location && (
-                          <p className="text-[11px] text-slate-400 flex items-center gap-1 font-mono">
-                            <MapPin className="h-3 w-3 text-orange-500" />
-                            {data.letterboxd.location}
-                          </p>
-                        )}
-                        {data.letterboxd.bio && (
-                          <p className="text-xs text-slate-300 mt-2 border-l-2 border-orange-500/30 pl-2 italic leading-relaxed max-w-xl">
-                            {data.letterboxd.bio}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                    <div className="bg-[#06080a] px-4 py-2 border border-slate-850 rounded-xl text-center self-stretch sm:self-auto flex sm:flex-col justify-center gap-1">
-                      <span className="text-[10px] text-slate-500 font-mono block">Diário Recente</span>
-                      <strong className="text-sm font-bold text-orange-400">{data.letterboxd.items?.length || 0} filmes logados</strong>
-                    </div>
-                  </div>
-
-                  {/* Scraped Stats Bento */}
-                  {data.letterboxd.stats && (
-                    <div className="p-6 border-b border-slate-900/60 bg-[#06080a]/30 grid grid-cols-2 sm:grid-cols-5 gap-4">
-                      {data.letterboxd.stats.films && (
-                        <div className="bg-[#0c0f13]/80 border border-slate-900 rounded-xl p-3.5 text-center">
-                          <span className="text-[10px] text-slate-500 font-mono block uppercase tracking-wider">Filmes</span>
-                          <strong className="text-lg font-bold text-orange-400 font-mono mt-1 block">{data.letterboxd.stats.films}</strong>
-                        </div>
-                      )}
-                      {data.letterboxd.stats.thisYear && (
-                        <div className="bg-[#0c0f13]/80 border border-slate-900 rounded-xl p-3.5 text-center">
-                          <span className="text-[10px] text-slate-500 font-mono block uppercase tracking-wider">Este Ano</span>
-                          <strong className="text-lg font-bold text-orange-400 font-mono mt-1 block">{data.letterboxd.stats.thisYear}</strong>
-                        </div>
-                      )}
-                      {data.letterboxd.stats.lists && (
-                        <div className="bg-[#0c0f13]/80 border border-slate-900 rounded-xl p-3.5 text-center">
-                          <span className="text-[10px] text-slate-500 font-mono block uppercase tracking-wider">Listas</span>
-                          <strong className="text-lg font-bold text-orange-400 font-mono mt-1 block">{data.letterboxd.stats.lists}</strong>
-                        </div>
-                      )}
-                      {data.letterboxd.stats.following && (
-                        <div className="bg-[#0c0f13]/80 border border-slate-900 rounded-xl p-3.5 text-center">
-                          <span className="text-[10px] text-slate-500 font-mono block uppercase tracking-wider">Seguindo</span>
-                          <strong className="text-lg font-bold text-orange-400 font-mono mt-1 block">{data.letterboxd.stats.following}</strong>
-                        </div>
-                      )}
-                      {data.letterboxd.stats.followers && (
-                        <div className="bg-[#0c0f13]/80 border border-slate-900 rounded-xl p-3.5 text-center">
-                          <span className="text-[10px] text-slate-500 font-mono block uppercase tracking-wider">Seguidores</span>
-                          <strong className="text-lg font-bold text-orange-400 font-mono mt-1 block">{data.letterboxd.stats.followers}</strong>
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Favorite Films Section */}
-                  {data.letterboxd.favorites && data.letterboxd.favorites.length > 0 && (
-                    <div className="p-6 border-b border-slate-900/60 bg-[#06080a]/10">
-                      <h4 className="text-xs font-mono font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2 mb-4">
-                        <Heart className="h-4 w-4 text-orange-500" />
-                        Filmes Favoritos
-                      </h4>
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                        {data.letterboxd.favorites.map((fav, fIdx) => (
-                          <a 
-                            key={fIdx} 
-                            href={fav.link}
-                            target="_blank" 
-                            rel="noreferrer"
-                            className="group bg-[#06080a]/80 border border-slate-900 rounded-xl p-3 flex flex-col items-center justify-between hover:border-orange-500/20 transition-all text-center gap-2"
-                          >
-                            {fav.posterUrl ? (
-                              <div className="aspect-[2/3] w-20 rounded-lg overflow-hidden border border-slate-950 shadow-md group-hover:scale-105 transition-transform duration-300">
-                                <img 
-                                  src={fav.posterUrl} 
-                                  alt={fav.name} 
-                                  className="w-full h-full object-cover"
-                                  referrerPolicy="no-referrer"
-                                />
-                              </div>
-                            ) : (
-                              <div className="aspect-[2/3] w-20 rounded-lg bg-slate-950 flex flex-col items-center justify-center border border-dashed border-slate-850 text-slate-600 font-mono text-[9px]">
-                                <Film className="h-5 w-5 mb-1 text-slate-700" />
-                                Sem Poster
-                              </div>
-                            )}
-                            <span className="text-xs font-bold text-slate-200 group-hover:text-orange-400 transition-colors line-clamp-2 leading-tight">
-                              {fav.name}
-                            </span>
-                          </a>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Film Entries List */}
-                  <div className="p-6 space-y-6">
-                    <h4 className="text-xs font-mono font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
-                      <Film className="h-4 w-4 text-orange-500" />
-                      Filmes Assistidos & Resenhas
-                    </h4>
-                    
-                    {data.letterboxd.items && data.letterboxd.items.length > 0 ? (
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {data.letterboxd.items.map((item, index) => (
-                          <div key={index} className="bg-[#06080a]/80 border border-slate-900 p-4 rounded-2xl flex gap-4 hover:border-slate-850 transition-all">
-                            {item.imageUrl && (
-                              <div className="h-28 w-20 rounded-lg bg-slate-950 overflow-hidden shrink-0 relative border border-slate-900 shadow">
-                                <img 
-                                  src={item.imageUrl} 
-                                  alt={item.filmTitle} 
-                                  referrerPolicy="no-referrer"
-                                  className="w-full h-full object-cover"
-                                />
-                              </div>
-                            )}
-                            <div className="flex-1 min-w-0 space-y-1.5">
-                              <div className="flex items-start justify-between gap-2">
-                                <h5 className="font-bold text-slate-100 text-sm truncate">{item.filmTitle}</h5>
-                                {item.rating && (
-                                  <span className="text-[10px] font-mono font-bold bg-orange-500/10 text-orange-400 border border-orange-500/20 px-2 py-0.5 rounded shrink-0">
-                                    ★ {item.rating}/5
-                                  </span>
-                                )}
-                              </div>
-                              <p className="text-[10px] text-slate-500 font-mono">
-                                Ano: {item.filmYear || "N/A"} • Publicado em {new Date(item.pubDate).toLocaleDateString("pt-BR")}
-                              </p>
-                              {item.review && (
-                                <p className="text-xs text-slate-400 line-clamp-3 bg-slate-900/30 p-2.5 rounded border border-slate-900/60 leading-relaxed italic">
-                                  "{item.review}"
-                                </p>
-                              )}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <p className="text-xs text-slate-500 italic">Nenhum filme recente encontrado no diário público.</p>
-                    )}
-                  </div>
-                </div>
-              </motion.div>
+              <LetterboxdDetail data={data.letterboxd} />
             ) : (
               renderConnectOnboarding("letterboxd")
             )
@@ -2167,163 +1697,7 @@ export default function App() {
               ========================================== */}
           {activeSection === "mal" && (
             data.mal ? (
-              <motion.div
-                key="mal"
-                initial={{ opacity: 0, y: 15 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -15 }}
-                className="max-w-5xl mx-auto space-y-6"
-              >
-                <div className="bg-[#0c0f13] border border-slate-900 rounded-2xl overflow-hidden shadow-xl">
-                  <div className="p-6 bg-gradient-to-r from-blue-950/20 to-slate-900/60 border-b border-slate-900 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                    <div className="flex items-center gap-4">
-                      {data.mal.images?.jpg?.image_url ? (
-                        <img 
-                          src={data.mal.images.jpg.image_url} 
-                          alt="avatar" 
-                          className="h-14 w-14 rounded-2xl border border-blue-500 object-cover bg-slate-900 shadow-lg"
-                        />
-                      ) : (
-                        <div className="h-14 w-14 rounded-2xl bg-blue-600 text-white font-black font-display flex items-center justify-center text-xl shadow-lg">
-                          {data.mal.username.substring(0, 2).toUpperCase()}
-                        </div>
-                      )}
-                      <div>
-                        <h3 className="text-xl font-bold text-white">{data.mal.username}</h3>
-                        <p className="text-xs text-blue-400 font-mono">
-                          Perfil do MyAnimeList • Membro desde {data.mal.joined ? new Date(data.mal.joined).toLocaleDateString("pt-BR") : "N/A"}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="p-6 space-y-6">
-                    {/* MAL statistics blocks */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      {/* Anime statistics */}
-                      {data.mal.statistics?.anime && (
-                        <div className="bg-[#06080a] border border-slate-900 p-5 rounded-2xl space-y-3">
-                          <h4 className="text-xs font-mono font-bold text-blue-400 uppercase tracking-wider flex items-center gap-2">
-                            <Tv className="h-4 w-4" />
-                            Estatísticas de Anime
-                          </h4>
-                          <div className="grid grid-cols-3 gap-3">
-                            <div className="bg-[#090b0e] p-3 rounded-xl text-center border border-slate-900">
-                              <span className="text-[10px] text-slate-500 font-mono block">Concluídos</span>
-                              <strong className="text-base font-bold text-slate-200">{data.mal.statistics.anime.completed}</strong>
-                            </div>
-                            <div className="bg-[#090b0e] p-3 rounded-xl text-center border border-slate-900">
-                              <span className="text-[10px] text-slate-500 font-mono block">Dias Assistindo</span>
-                              <strong className="text-base font-bold text-slate-200">{data.mal.statistics.anime.days_watched}</strong>
-                            </div>
-                            <div className="bg-[#090b0e] p-3 rounded-xl text-center border border-slate-900">
-                              <span className="text-[10px] text-slate-500 font-mono block">Média de Nota</span>
-                              <strong className="text-base font-bold text-slate-200">{data.mal.statistics.anime.mean_score}</strong>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Manga statistics */}
-                      {data.mal.statistics?.manga && (
-                        <div className="bg-[#06080a] border border-slate-900 p-5 rounded-2xl space-y-3">
-                          <h4 className="text-xs font-mono font-bold text-blue-400 uppercase tracking-wider flex items-center gap-2">
-                            <BookOpen className="h-4 w-4" />
-                            Estatísticas de Mangá
-                          </h4>
-                          <div className="grid grid-cols-3 gap-3">
-                            <div className="bg-[#090b0e] p-3 rounded-xl text-center border border-slate-900">
-                              <span className="text-[10px] text-slate-500 font-mono block">Concluídos</span>
-                              <strong className="text-base font-bold text-slate-200">{data.mal.statistics.manga.completed}</strong>
-                            </div>
-                            <div className="bg-[#090b0e] p-3 rounded-xl text-center border border-slate-900">
-                              <span className="text-[10px] text-slate-500 font-mono block">Dias Lendo</span>
-                              <strong className="text-base font-bold text-slate-200">{data.mal.statistics.manga.days_read}</strong>
-                            </div>
-                            <div className="bg-[#090b0e] p-3 rounded-xl text-center border border-slate-900">
-                              <span className="text-[10px] text-slate-500 font-mono block">Média de Nota</span>
-                              <strong className="text-base font-bold text-slate-200">{data.mal.statistics.manga.mean_score}</strong>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* MAL Favorites Anime & Manga */}
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                      {/* Favorite Anime */}
-                      <div className="space-y-3">
-                        <h4 className="text-xs font-mono font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
-                          <Heart className="h-4 w-4 text-rose-500" />
-                          Animes Favoritos ({data.mal.favorites?.anime?.length || 0})
-                        </h4>
-                        {data.mal.favorites?.anime?.length ? (
-                          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                            {data.mal.favorites.anime.slice(0, 6).map((anime, index) => (
-                              <div key={index} className="bg-[#06080a] border border-slate-900 rounded-xl overflow-hidden hover:border-slate-800 transition-all group">
-                                <div className="h-28 bg-slate-900 overflow-hidden relative">
-                                  {anime.images?.jpg?.large_image_url ? (
-                                    <img 
-                                      src={anime.images.jpg.large_image_url} 
-                                      alt={anime.title} 
-                                      referrerPolicy="no-referrer"
-                                      className="w-full h-full object-cover group-hover:scale-105 transition-all"
-                                    />
-                                  ) : (
-                                    <div className="w-full h-full bg-slate-950 flex items-center justify-center text-[10px] italic text-slate-600">Sem Capa</div>
-                                  )}
-                                </div>
-                                <div className="p-2">
-                                  <p className="text-xs font-bold text-slate-200 line-clamp-2 leading-tight">
-                                    {anime.title}
-                                  </p>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        ) : (
-                          <p className="text-xs text-slate-500 italic">Nenhum anime favoritado no MyAnimeList.</p>
-                        )}
-                      </div>
-
-                      {/* Favorite Manga */}
-                      <div className="space-y-3">
-                        <h4 className="text-xs font-mono font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
-                          <BookOpen className="h-4 w-4 text-emerald-500" />
-                          Mangás Favoritos ({data.mal.favorites?.manga?.length || 0})
-                        </h4>
-                        {data.mal.favorites?.manga?.length ? (
-                          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                            {data.mal.favorites.manga.slice(0, 6).map((manga, index) => (
-                              <div key={index} className="bg-[#06080a] border border-slate-900 rounded-xl overflow-hidden hover:border-slate-800 transition-all group">
-                                <div className="h-28 bg-slate-900 overflow-hidden relative">
-                                  {manga.images?.jpg?.large_image_url ? (
-                                    <img 
-                                      src={manga.images.jpg.large_image_url} 
-                                      alt={manga.title} 
-                                      referrerPolicy="no-referrer"
-                                      className="w-full h-full object-cover group-hover:scale-105 transition-all"
-                                    />
-                                  ) : (
-                                    <div className="w-full h-full bg-slate-950 flex items-center justify-center text-[10px] italic text-slate-600">Sem Capa</div>
-                                  )}
-                                </div>
-                                <div className="p-2">
-                                  <p className="text-xs font-bold text-slate-200 line-clamp-2 leading-tight">
-                                    {manga.title}
-                                  </p>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        ) : (
-                          <p className="text-xs text-slate-500 italic">Nenhum mangá favoritado no MyAnimeList.</p>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </motion.div>
+              <MalDetail data={data.mal} />
             ) : (
               renderConnectOnboarding("mal")
             )
@@ -2334,108 +1708,7 @@ export default function App() {
               ========================================== */}
           {activeSection === "serializd" && (
             data.serializd ? (
-              <motion.div
-                key="serializd"
-                initial={{ opacity: 0, y: 15 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -15 }}
-                className="max-w-5xl mx-auto space-y-6"
-              >
-                <div className="bg-[#0c0f13] border border-slate-900 rounded-2xl overflow-hidden shadow-xl">
-                  {/* Header Banner */}
-                  <div className="p-6 bg-gradient-to-r from-teal-950/20 to-slate-900/60 border-b border-slate-900 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                    <div className="flex items-center gap-4">
-                      {data.serializd.profilePicture ? (
-                        <img 
-                          src={data.serializd.profilePicture} 
-                          alt="avatar" 
-                          className="h-14 w-14 rounded-2xl border border-teal-500/30 object-cover shadow-lg"
-                        />
-                      ) : (
-                        <div className="h-14 w-14 rounded-2xl bg-teal-600 text-white font-black font-display flex items-center justify-center text-xl shadow-lg">
-                          {data.serializd.username.substring(0, 2).toUpperCase()}
-                        </div>
-                      )}
-                      <div>
-                        <h3 className="text-xl font-bold text-white">{data.serializd.username}</h3>
-                        <p className="text-xs text-teal-400 font-mono">
-                          Perfil Serializd • Diário de Séries de TV
-                        </p>
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-2 sm:flex sm:items-center bg-[#06080a] p-2 border border-slate-850 rounded-xl text-center text-xs">
-                      <div className="px-3 py-1">
-                        <span className="text-[10px] text-slate-500 font-mono block">Reviews</span>
-                        <strong className="text-sm font-bold text-teal-400">{data.serializd.stats?.reviewsCount || 0}</strong>
-                      </div>
-                      <div className="px-3 py-1 border-l border-slate-900">
-                        <span className="text-[10px] text-slate-500 font-mono block">Seguidores</span>
-                        <strong className="text-sm font-bold text-teal-400">{data.serializd.stats?.followersCount || 0}</strong>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="p-6 space-y-6">
-                    {/* Biography */}
-                    {data.serializd.biography && (
-                      <div className="bg-[#06080a] p-4 rounded-xl border border-slate-900 text-xs text-slate-400 space-y-1">
-                        <span className="text-[10px] text-slate-500 font-mono uppercase block">Biografia do Serializd</span>
-                        <p className="text-slate-300 leading-relaxed">{data.serializd.biography}</p>
-                      </div>
-                    )}
-
-                    {/* Logged TV Shows List */}
-                    <h4 className="text-xs font-mono font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
-                      <Tv className="h-4 w-4 text-teal-400" />
-                      Reviews & Séries Recentes
-                    </h4>
-
-                    {data.serializd.items && data.serializd.items.length > 0 ? (
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {data.serializd.items.map((item) => (
-                          <div key={item.id} className="bg-[#06080a]/80 border border-slate-900 p-4 rounded-2xl flex gap-4 hover:border-slate-850 transition-all">
-                            {item.bannerUrl && (
-                              <div className="h-28 w-20 rounded-lg bg-slate-950 overflow-hidden shrink-0 relative border border-slate-900 shadow">
-                                <img 
-                                  src={item.bannerUrl} 
-                                  alt={item.showName} 
-                                  referrerPolicy="no-referrer"
-                                  className="w-full h-full object-cover"
-                                />
-                              </div>
-                            )}
-                            <div className="flex-1 min-w-0 space-y-1.5">
-                              <div className="flex items-start justify-between gap-2">
-                                <h5 className="font-bold text-slate-100 text-sm truncate">{item.showName}</h5>
-                                {item.rating && (
-                                  <span className="text-[10px] font-mono font-bold bg-teal-500/10 text-teal-400 border border-teal-500/20 px-2 py-0.5 rounded shrink-0">
-                                    ★ {item.rating}/10
-                                  </span>
-                                )}
-                              </div>
-                              <p className="text-[10px] text-slate-500 font-mono">
-                                {item.seasonName || "Série Completa"} {item.episodeName ? `• ${item.episodeName}` : ""}
-                              </p>
-                              {item.reviewText && (
-                                <p className="text-xs text-slate-400 line-clamp-3 bg-slate-900/30 p-2.5 rounded border border-slate-900/60 leading-relaxed italic">
-                                  "{item.reviewText}"
-                                </p>
-                              )}
-                              {item.isSpoiler && (
-                                <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 bg-red-500/10 text-red-400 border border-red-500/20 rounded">
-                                  Spoilers
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <p className="text-xs text-slate-500 italic">Nenhum show recente encontrado no diário público.</p>
-                    )}
-                  </div>
-                </div>
-              </motion.div>
+              <SerializdDetail data={data.serializd} />
             ) : (
               renderConnectOnboarding("serializd")
             )
@@ -2446,80 +1719,7 @@ export default function App() {
               ========================================== */}
           {activeSection === "trakt" && (
             data.trakt ? (
-              <motion.div
-                key="trakt"
-                initial={{ opacity: 0, y: 15 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -15 }}
-                className="max-w-5xl mx-auto space-y-6"
-              >
-                <div className="bg-[#0c0f13] border border-slate-900 rounded-2xl overflow-hidden shadow-xl">
-                  {/* Header Banner */}
-                  <div className="p-6 bg-gradient-to-r from-rose-950/20 to-slate-900/60 border-b border-slate-900 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                    <div className="flex items-center gap-4">
-                      <div className="h-14 w-14 rounded-2xl bg-rose-600 text-white font-black font-display flex items-center justify-center text-xl shadow-lg">
-                        {data.trakt.username.substring(0, 2).toUpperCase()}
-                      </div>
-                      <div>
-                        <h3 className="text-xl font-bold text-white">{data.trakt.username}</h3>
-                        <p className="text-xs text-rose-400 font-mono">
-                          Perfil Trakt.tv • <a href={data.trakt.profileUrl} target="_blank" rel="noreferrer" className="underline inline-flex items-center gap-1 hover:text-rose-300">Trakt.tv <ExternalLink className="h-3 w-3" /></a>
-                        </p>
-                      </div>
-                    </div>
-                    <div className="bg-[#06080a] px-4 py-2 border border-slate-850 rounded-xl text-center self-stretch sm:self-auto">
-                      <span className="text-[10px] text-slate-500 font-mono block">Histórico do Feed</span>
-                      <strong className="text-base font-bold text-rose-400">{data.trakt.items?.length || 0} itens mapeados</strong>
-                    </div>
-                  </div>
-
-                  {/* Trakt History entries list */}
-                  <div className="p-6 space-y-6">
-                    <h4 className="text-xs font-mono font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
-                      <Flame className="h-4 w-4 text-rose-500" />
-                      Atividade do Histórico de Visualização
-                    </h4>
-
-                    {data.trakt.items && data.trakt.items.length > 0 ? (
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {data.trakt.items.map((item, index) => (
-                          <div key={index} className="bg-[#06080a]/80 border border-slate-900 p-4 rounded-2xl space-y-3 hover:border-slate-850 transition-all">
-                            <div className="flex items-start justify-between gap-3">
-                              <div className="space-y-1">
-                                <span className="text-[9px] font-mono font-bold uppercase px-1.5 py-0.5 bg-rose-500/10 text-rose-400 border border-rose-500/20 rounded">
-                                  {item.action === "rated" ? "Avaliou" : "Assistiu"}
-                                </span>
-                                <h5 className="font-bold text-slate-100 text-sm leading-snug">{item.title}</h5>
-                              </div>
-                              <a 
-                                href={item.link} 
-                                target="_blank" 
-                                rel="noreferrer" 
-                                className="text-slate-600 hover:text-slate-400 transition-all shrink-0 mt-0.5"
-                              >
-                                <ExternalLink className="h-4 w-4" />
-                              </a>
-                            </div>
-
-                            <div className="flex flex-col gap-1 text-[10px] text-slate-500 font-mono">
-                              {item.description && (
-                                <p className="text-xs text-slate-400 italic font-sans bg-slate-950/40 p-2.5 rounded border border-slate-900/60 leading-relaxed mb-1">
-                                  "{item.description}"
-                                </p>
-                              )}
-                              {item.pubDate && (
-                                <span>Registrado em: {new Date(item.pubDate).toLocaleString("pt-BR")}</span>
-                              )}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <p className="text-xs text-slate-500 italic">Nenhuma atividade recente encontrada no histórico público do Trakt.</p>
-                    )}
-                  </div>
-                </div>
-              </motion.div>
+              <TraktDetail data={data.trakt} />
             ) : (
               renderConnectOnboarding("trakt")
             )
@@ -2530,329 +1730,7 @@ export default function App() {
               ========================================== */}
           {activeSection === "lastfm" && (
             data.lastfm ? (
-              <motion.div
-                key="lastfm"
-                initial={{ opacity: 0, y: 15 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -15 }}
-                className="max-w-5xl mx-auto space-y-6"
-              >
-                <div className="bg-[#0c0f13] border border-slate-900 rounded-2xl overflow-hidden shadow-xl">
-                  {/* Header Banner */}
-                  <div className="p-6 bg-gradient-to-r from-red-950/20 to-slate-900/60 border-b border-slate-900 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                    <div className="flex items-center gap-4">
-                      <div className="h-14 w-14 rounded-2xl bg-red-600 text-white font-black font-display flex items-center justify-center text-xl shadow-lg relative overflow-hidden group">
-                        <div className="absolute inset-0 bg-gradient-to-tr from-black/20 to-transparent" />
-                        <span className="relative z-10">{data.lastfm.username.substring(0, 2).toUpperCase()}</span>
-                      </div>
-                      <div>
-                        <h3 className="text-xl font-bold text-white flex items-center gap-2">
-                          {data.lastfm.username}
-                          <span className="px-2 py-0.5 rounded-full text-[9px] bg-red-500/10 text-red-400 border border-red-500/20 font-mono font-bold uppercase tracking-wide">Last.fm</span>
-                        </h3>
-                        <p className="text-xs text-red-400 font-mono mt-0.5">
-                          Histórico de Músicas • <a href={data.lastfm.profileUrl} target="_blank" rel="noreferrer" className="underline inline-flex items-center gap-1 hover:text-red-300">Last.fm <ExternalLink className="h-3 w-3" /></a>
-                        </p>
-                      </div>
-                    </div>
-                    <div className="bg-[#06080a] px-4 py-2 border border-slate-850 rounded-xl text-center self-stretch sm:self-auto">
-                      <span className="text-[10px] text-slate-500 font-mono block">Scrobbles Obtidos</span>
-                      <strong className="text-base font-bold text-red-400">{data.lastfm.items?.length || 0} faixas</strong>
-                    </div>
-                  </div>
-
-                  {/* Tab Selector */}
-                  <div className="px-6 py-2 bg-[#06080a] border-b border-slate-900 flex flex-wrap gap-2 overflow-x-auto scrollbar-none">
-                    <button
-                      onClick={() => setLastfmTab("recent")}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold font-mono transition-all flex items-center gap-1.5 ${
-                        lastfmTab === "recent"
-                          ? "bg-red-500/10 text-red-400 border border-red-500/30"
-                          : "text-slate-400 hover:text-slate-200 border border-transparent"
-                      }`}
-                    >
-                      <Clock className="h-3.5 w-3.5" />
-                      Recentes ({data.lastfm.items?.length || 0})
-                    </button>
-                    <button
-                      onClick={() => setLastfmTab("loved")}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold font-mono transition-all flex items-center gap-1.5 ${
-                        lastfmTab === "loved"
-                          ? "bg-red-500/10 text-red-400 border border-red-500/30"
-                          : "text-slate-400 hover:text-slate-200 border border-transparent"
-                      }`}
-                    >
-                      <Heart className="h-3.5 w-3.5" />
-                      Favoritas ({data.lastfm.lovedTracks?.length || 0})
-                    </button>
-                    <button
-                      onClick={() => setLastfmTab("toptracks")}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold font-mono transition-all flex items-center gap-1.5 ${
-                        lastfmTab === "toptracks"
-                          ? "bg-red-500/10 text-red-400 border border-red-500/30"
-                          : "text-slate-400 hover:text-slate-200 border border-transparent"
-                      }`}
-                    >
-                      <Award className="h-3.5 w-3.5" />
-                      Top Músicas ({data.lastfm.topTracks?.length || 0})
-                    </button>
-                    <button
-                      onClick={() => setLastfmTab("topartists")}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold font-mono transition-all flex items-center gap-1.5 ${
-                        lastfmTab === "topartists"
-                          ? "bg-red-500/10 text-red-400 border border-red-500/30"
-                          : "text-slate-400 hover:text-slate-200 border border-transparent"
-                      }`}
-                    >
-                      <User className="h-3.5 w-3.5" />
-                      Top Artistas ({data.lastfm.topArtists?.length || 0})
-                    </button>
-                    <button
-                      onClick={() => setLastfmTab("recommended")}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold font-mono transition-all flex items-center gap-1.5 ${
-                        lastfmTab === "recommended"
-                          ? "bg-red-500/10 text-red-400 border border-red-500/30"
-                          : "text-slate-400 hover:text-slate-200 border border-transparent"
-                      }`}
-                    >
-                      <Sparkles className="h-3.5 w-3.5" />
-                      Recomendações ({data.lastfm.recommendedTracks?.length || 0})
-                    </button>
-                  </div>
-
-                  {/* Last.fm History entries list */}
-                  <div className="p-6 space-y-6">
-                    {data.lastfm.fallback && (
-                      <div className="bg-[#110d06] border border-amber-950 p-4 rounded-xl text-amber-300 text-xs flex items-start gap-3 leading-relaxed">
-                        <AlertCircle className="h-5 w-5 shrink-0 mt-0.5 text-amber-500" />
-                        <div>
-                          <strong className="block mb-0.5">Perfil sem Histórico ou Privado</strong>
-                          Não conseguimos ler reproduções recentes do Last.fm para o usuário "<strong>{data.lastfm.username}</strong>". Isso ocorre se o perfil for novo, não tiver scrobbles recentes, estiver configurado como privado ou se o nome de usuário não existir.
-                        </div>
-                      </div>
-                    )}
-
-                    {lastfmTab === "recent" && (
-                      <>
-                        <h4 className="text-xs font-mono font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
-                          <span className="relative flex h-2 w-2 mr-1">
-                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75 animate-duration-1000"></span>
-                            <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
-                          </span>
-                          Faixas Ouvidas Recentemente
-                        </h4>
-
-                        {data.lastfm.items && data.lastfm.items.length > 0 ? (
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            {data.lastfm.items.map((item, index) => (
-                              <div key={index} className="bg-[#06080a]/80 border border-slate-900 p-4 rounded-2xl flex items-center justify-between gap-4 hover:border-red-500/30 hover:bg-[#0c0d11]/40 transition-all duration-300 group">
-                                <div className="flex items-center gap-3.5 overflow-hidden">
-                                  {/* Vinyl Disc Style Placeholder */}
-                                  <div className="h-10 w-10 rounded-full bg-slate-950 flex items-center justify-center border border-slate-800 shadow relative shrink-0 overflow-hidden">
-                                    <div className="absolute inset-2 rounded-full border border-dashed border-slate-800 animate-spin" style={{ animationDuration: '6s' }} />
-                                    <div className="h-3 w-3 rounded-full bg-red-500 z-10 border border-slate-950" />
-                                  </div>
-                                  <div className="overflow-hidden">
-                                    <h5 className="font-bold text-slate-100 text-sm truncate group-hover:text-red-400 transition-colors">{item.trackName}</h5>
-                                    <p className="text-xs text-slate-400 truncate mt-0.5">{item.artist}</p>
-                                  </div>
-                                </div>
-                                
-                                <div className="flex items-center gap-3 shrink-0">
-                                  {item.pubDate ? (
-                                    <span className="text-[10px] text-slate-500 font-mono">
-                                      {item.pubDate.includes("now playing") || item.pubDate.includes("reproduzindo") ? (
-                                        <span className="text-red-500 font-bold flex items-center gap-1">
-                                          TOCANDO AGORA
-                                        </span>
-                                      ) : (
-                                        item.pubDate
-                                      )}
-                                    </span>
-                                  ) : (
-                                    <span className="text-[10px] text-red-500 font-bold">AGORA</span>
-                                  )}
-                                  <a 
-                                    href={item.link} 
-                                    target="_blank" 
-                                    rel="noreferrer" 
-                                    className="text-slate-600 hover:text-red-400 transition-all"
-                                  >
-                                    <ExternalLink className="h-4 w-4" />
-                                  </a>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        ) : (
-                          <p className="text-xs text-slate-500 italic">Nenhuma música recente encontrada no histórico público do Last.fm.</p>
-                        )}
-                      </>
-                    )}
-
-                    {lastfmTab === "loved" && (
-                      <>
-                        <h4 className="text-xs font-mono font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
-                          <Heart className="h-4 w-4 text-red-500" />
-                          Músicas Favoritadas (Loved Tracks)
-                        </h4>
-
-                        {data.lastfm.lovedTracks && data.lastfm.lovedTracks.length > 0 ? (
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            {data.lastfm.lovedTracks.map((item, index) => (
-                              <div key={index} className="bg-[#06080a]/80 border border-red-500/10 p-4 rounded-2xl flex items-center justify-between gap-4 hover:border-red-500/40 hover:bg-[#0c0d11]/40 transition-all duration-300 group">
-                                <div className="flex items-center gap-3.5 overflow-hidden">
-                                  <div className="h-10 w-10 rounded-full bg-slate-950 flex items-center justify-center border border-red-955 shadow relative shrink-0 overflow-hidden">
-                                    <div className="absolute inset-2 rounded-full border border-dashed border-red-900/30 animate-spin" style={{ animationDuration: '8s' }} />
-                                    <Heart className="h-3 w-3 text-red-500 fill-red-500 z-10" />
-                                  </div>
-                                  <div className="overflow-hidden">
-                                    <h5 className="font-bold text-slate-100 text-sm truncate group-hover:text-red-400 transition-colors">{item.trackName}</h5>
-                                    <p className="text-xs text-slate-400 truncate mt-0.5">{item.artist}</p>
-                                  </div>
-                                </div>
-                                
-                                <div className="flex items-center gap-3 shrink-0">
-                                  <a 
-                                    href={item.link} 
-                                    target="_blank" 
-                                    rel="noreferrer" 
-                                    className="text-slate-600 hover:text-red-400 transition-all"
-                                  >
-                                    <ExternalLink className="h-4 w-4" />
-                                  </a>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        ) : (
-                          <p className="text-xs text-slate-500 italic">Nenhuma música favorita encontrada no perfil público do Last.fm.</p>
-                        )}
-                      </>
-                    )}
-
-                    {lastfmTab === "toptracks" && (
-                      <>
-                        <h4 className="text-xs font-mono font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
-                          <Award className="h-4 w-4 text-amber-500" />
-                          Faixas Mais Tocadas (Top Tracks)
-                        </h4>
-
-                        {data.lastfm.topTracks && data.lastfm.topTracks.length > 0 ? (
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            {data.lastfm.topTracks.map((item, index) => (
-                              <div key={index} className="bg-[#06080a]/80 border border-slate-900 p-4 rounded-2xl flex items-center justify-between gap-4 hover:border-red-500/30 hover:bg-[#0c0d11]/40 transition-all duration-300 group">
-                                <div className="flex items-center gap-3.5 overflow-hidden">
-                                  <div className="h-10 w-10 rounded-full bg-slate-950 flex items-center justify-center border border-slate-850 shadow relative shrink-0 overflow-hidden font-mono font-bold text-slate-500 text-xs">
-                                    #{index + 1}
-                                  </div>
-                                  <div className="overflow-hidden">
-                                    <h5 className="font-bold text-slate-100 text-sm truncate group-hover:text-red-400 transition-colors">{item.trackName}</h5>
-                                    <p className="text-xs text-slate-400 truncate mt-0.5">{item.artist}</p>
-                                  </div>
-                                </div>
-                                
-                                <div className="flex items-center gap-3 shrink-0">
-                                  <a 
-                                    href={item.link} 
-                                    target="_blank" 
-                                    rel="noreferrer" 
-                                    className="text-slate-600 hover:text-red-400 transition-all"
-                                  >
-                                    <ExternalLink className="h-4 w-4" />
-                                  </a>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        ) : (
-                          <p className="text-xs text-slate-500 italic">Nenhum histórico de reproduções mais ouvidas disponível.</p>
-                        )}
-                      </>
-                    )}
-
-                    {lastfmTab === "topartists" && (
-                      <>
-                        <h4 className="text-xs font-mono font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
-                          <User className="h-4 w-4 text-blue-400" />
-                          Artistas Mais Tocados (Top Artists)
-                        </h4>
-
-                        {data.lastfm.topArtists && data.lastfm.topArtists.length > 0 ? (
-                          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                            {data.lastfm.topArtists.map((item, index) => {
-                              const artistName = item.title || item.trackName || "Artista Desconhecido";
-                              return (
-                                <div key={index} className="bg-[#06080a]/80 border border-slate-900 p-4 rounded-2xl flex items-center justify-between gap-3 hover:border-red-500/30 hover:bg-[#0c0d11]/40 transition-all duration-300 group font-sans">
-                                  <div className="flex items-center gap-3 overflow-hidden">
-                                    <div className="h-10 w-10 rounded-full bg-slate-900 flex items-center justify-center border border-slate-800 shrink-0 font-mono text-xs text-slate-500 font-bold">
-                                      #{index + 1}
-                                    </div>
-                                    <div className="overflow-hidden">
-                                      <h5 className="font-bold text-slate-100 text-sm truncate group-hover:text-red-400 transition-colors">{artistName}</h5>
-                                      <p className="text-[10px] text-slate-500 font-mono uppercase mt-0.5">Artista</p>
-                                    </div>
-                                  </div>
-                                  <a 
-                                    href={item.link} 
-                                    target="_blank" 
-                                    rel="noreferrer" 
-                                    className="text-slate-600 hover:text-red-400 transition-all shrink-0"
-                                  >
-                                    <ExternalLink className="h-4 w-4" />
-                                  </a>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        ) : (
-                          <p className="text-xs text-slate-500 italic">Nenhum artista mais ouvido disponível.</p>
-                        )}
-                      </>
-                    )}
-
-                    {lastfmTab === "recommended" && (
-                      <>
-                        <h4 className="text-xs font-mono font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
-                          <Sparkles className="h-4 w-4 text-purple-400" />
-                          Sugestões de Recomendadas (Recommended Tracks)
-                        </h4>
-
-                        {data.lastfm.recommendedTracks && data.lastfm.recommendedTracks.length > 0 ? (
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            {data.lastfm.recommendedTracks.map((item, index) => (
-                              <div key={index} className="bg-[#06080a]/80 border border-purple-500/10 p-4 rounded-2xl flex items-center justify-between gap-4 hover:border-purple-500/40 hover:bg-[#0c0d11]/40 transition-all duration-300 group">
-                                <div className="flex items-center gap-3.5 overflow-hidden">
-                                  <div className="h-10 w-10 rounded-full bg-slate-950 flex items-center justify-center border border-purple-950 shadow relative shrink-0 overflow-hidden">
-                                    <Sparkles className="h-3.5 w-3.5 text-purple-400" />
-                                  </div>
-                                  <div className="overflow-hidden">
-                                    <h5 className="font-bold text-slate-100 text-sm truncate group-hover:text-purple-400 transition-colors">{item.trackName}</h5>
-                                    <p className="text-xs text-slate-400 truncate mt-0.5">{item.artist}</p>
-                                  </div>
-                                </div>
-                                
-                                <div className="flex items-center gap-3 shrink-0">
-                                  <a 
-                                    href={item.link} 
-                                    target="_blank" 
-                                    rel="noreferrer" 
-                                    className="text-slate-600 hover:text-purple-400 transition-all"
-                                  >
-                                    <ExternalLink className="h-4 w-4" />
-                                  </a>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        ) : (
-                          <p className="text-xs text-slate-500 italic">Nenhuma recomendação de música encontrada para este perfil no momento.</p>
-                        )}
-                      </>
-                    )}
-                  </div>
-                </div>
-              </motion.div>
+              <LastfmDetail data={data.lastfm} />
             ) : (
               renderConnectOnboarding("lastfm")
             )
@@ -2863,106 +1741,7 @@ export default function App() {
               ========================================== */}
           {activeSection === "mydramalist" && (
             data.mydramalist ? (
-              <motion.div
-                key="mydramalist"
-                initial={{ opacity: 0, y: 15 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -15 }}
-                className="max-w-5xl mx-auto space-y-6"
-              >
-                <div className="bg-[#0c0f13] border border-slate-900 rounded-2xl overflow-hidden shadow-xl">
-                  {/* Header Banner */}
-                  <div className="p-6 bg-gradient-to-r from-blue-950/20 to-slate-900/60 border-b border-slate-900 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                    <div className="flex items-center gap-4">
-                      {data.mydramalist.avatar ? (
-                        <img 
-                          src={data.mydramalist.avatar} 
-                          alt="avatar" 
-                          className="h-14 w-14 rounded-2xl object-cover border border-blue-500/20 shadow-lg"
-                        />
-                      ) : (
-                        <div className="h-14 w-14 rounded-2xl bg-blue-600 text-white font-black font-display flex items-center justify-center text-xl shadow-lg">
-                          {data.mydramalist.displayName.substring(0, 2).toUpperCase()}
-                        </div>
-                      )}
-                      <div>
-                        <h3 className="text-xl font-bold text-white flex items-center gap-2">
-                          {data.mydramalist.displayName}
-                          <span className="px-2 py-0.5 rounded-full text-[9px] bg-blue-500/10 text-blue-400 border border-blue-500/20 font-mono font-bold uppercase tracking-wide">MyDramaList</span>
-                        </h3>
-                        <p className="text-xs text-blue-400 font-mono mt-0.5">
-                          Perfil de Doramas • <a href={data.mydramalist.profileUrl} target="_blank" rel="noreferrer" className="underline inline-flex items-center gap-1 hover:text-blue-300">MyDramaList <ExternalLink className="h-3 w-3" /></a>
-                        </p>
-                      </div>
-                    </div>
-                    <div className="bg-[#06080a] px-4 py-2 border border-slate-850 rounded-xl text-center self-stretch sm:self-auto">
-                      <span className="text-[10px] text-slate-500 font-mono block">Dramas Assistidos</span>
-                      <strong className="text-base font-bold text-blue-400">{data.mydramalist.stats?.completed || 0} títulos</strong>
-                    </div>
-                  </div>
-
-                  {/* Stats Summary Bento cards */}
-                  <div className="p-6 space-y-6">
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                      <div className="bg-[#06080a]/85 border border-slate-900/80 p-5 rounded-2xl text-center shadow-md">
-                        <span className="text-[10px] text-slate-500 font-mono uppercase block mb-1">Completados</span>
-                        <strong className="text-2xl font-black font-display text-emerald-400">{data.mydramalist.stats?.completed || 0}</strong>
-                        <p className="text-[10px] text-slate-500 mt-1">Dramas concluídos</p>
-                      </div>
-                      <div className="bg-[#06080a]/85 border border-slate-900/80 p-5 rounded-2xl text-center shadow-md">
-                        <span className="text-[10px] text-slate-500 font-mono uppercase block mb-1">Assistindo</span>
-                        <strong className="text-2xl font-black font-display text-blue-400">{data.mydramalist.stats?.watching || 0}</strong>
-                        <p className="text-[10px] text-slate-500 mt-1">Séries em progresso</p>
-                      </div>
-                      <div className="bg-[#06080a]/85 border border-slate-900/80 p-5 rounded-2xl text-center shadow-md">
-                        <span className="text-[10px] text-slate-500 font-mono uppercase block mb-1">Planejam Assistir</span>
-                        <strong className="text-2xl font-black font-display text-pink-400">{data.mydramalist.stats?.planToWatch || 0}</strong>
-                        <p className="text-[10px] text-slate-500 mt-1">Na lista de espera</p>
-                      </div>
-                    </div>
-
-                    {data.mydramalist.fallback && (
-                      <div className="bg-[#110d06] border border-amber-950 p-4 rounded-xl text-amber-300 text-xs flex items-start gap-3 leading-relaxed">
-                        <AlertCircle className="h-5 w-5 shrink-0 mt-0.5 text-amber-500" />
-                        <div>
-                          <strong className="block mb-0.5">Sincronização Básica Ativa</strong>
-                          Os dados do MyDramaList estão em sincronização rápida. Você pode visitar o link oficial para ver a lista completa de dramas, resenhas e contatos do usuário em tempo real!
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Curated list / custom drama log */}
-                    <div className="border border-slate-900 rounded-2xl bg-[#06080a]/50 p-6 space-y-4">
-                      <h4 className="text-xs font-mono font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
-                        <Sparkles className="h-4 w-4 text-blue-400" />
-                        Destaques de Dramas Populares
-                      </h4>
-                      <p className="text-xs text-slate-400">
-                        Confira os dramas e séries mais aclamados da comunidade para maratona imediata.
-                      </p>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {[
-                          { title: "Crash Landing on You", genres: "Romance, Comédia, Drama", rating: "9.0", episodes: "16 eps", desc: "Uma herdeira sul-coreana cai acidentalmente na Coreia do Norte e é protegida por um capitão do exército." },
-                          { title: "Goblin (Guardian)", genres: "Fantasia, Romance, Drama", rating: "8.8", episodes: "16 eps", desc: "Um goblin imortal precisa encontrar sua noiva humana para quebrar uma maldição secular." },
-                          { title: "Twenty-Five Twenty-One", genres: "Romance, Juventude, Melodrama", rating: "8.9", episodes: "16 eps", desc: "O relacionamento amoroso e de crescimento de dois jovens em meio à crise financeira de 1998." },
-                          { title: "Alchemy of Souls", genres: "Ação, Fantasia, Romance", rating: "9.1", episodes: "30 eps", desc: "Feiticeiros poderosos lidam com destinos trocados devido à magia de transmigração de almas." }
-                        ].map((item, i) => (
-                          <div key={i} className="bg-slate-950/80 border border-slate-900/60 p-4 rounded-xl flex flex-col justify-between hover:border-blue-500/30 transition-all group">
-                            <div>
-                              <div className="flex justify-between items-start gap-2">
-                                <h5 className="font-bold text-slate-200 text-sm group-hover:text-blue-400 transition-colors">{item.title}</h5>
-                                <span className="text-[10px] font-mono font-bold bg-blue-500/10 text-blue-400 px-1.5 py-0.5 rounded border border-blue-500/20">{item.rating}</span>
-                              </div>
-                              <p className="text-[10px] text-slate-500 mt-0.5 font-mono">{item.genres} • {item.episodes}</p>
-                              <p className="text-xs text-slate-400 mt-2.5 leading-relaxed">{item.desc}</p>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </motion.div>
+              <MydramalistDetail data={data.mydramalist} />
             ) : (
               renderConnectOnboarding("mydramalist")
             )
@@ -2973,109 +1752,7 @@ export default function App() {
               ========================================== */}
           {activeSection === "simkl" && (
             data.simkl ? (
-              <motion.div
-                key="simkl"
-                initial={{ opacity: 0, y: 15 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -15 }}
-                className="max-w-5xl mx-auto space-y-6"
-              >
-                <div className="bg-[#0c0f13] border border-slate-900 rounded-2xl overflow-hidden shadow-xl">
-                  {/* Header Banner */}
-                  <div className="p-6 bg-gradient-to-r from-yellow-950/20 to-slate-900/60 border-b border-slate-900 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                    <div className="flex items-center gap-4">
-                      {data.simkl.avatar ? (
-                        <img 
-                          src={data.simkl.avatar} 
-                          alt="avatar" 
-                          className="h-14 w-14 rounded-2xl object-cover border border-yellow-500/20 shadow-lg"
-                        />
-                      ) : (
-                        <div className="h-14 w-14 rounded-2xl bg-yellow-600 text-black font-black font-display flex items-center justify-center text-xl shadow-lg">
-                          {data.simkl.displayName.substring(0, 2).toUpperCase()}
-                        </div>
-                      )}
-                      <div>
-                        <h3 className="text-xl font-bold text-white flex items-center gap-2">
-                          {data.simkl.displayName}
-                          <span className="px-2 py-0.5 rounded-full text-[9px] bg-yellow-500/10 text-yellow-400 border border-yellow-500/20 font-mono font-bold uppercase tracking-wide">Simkl</span>
-                        </h3>
-                        <p className="text-xs text-yellow-400 font-mono mt-0.5">
-                          Perfil de Multimídia • <a href={data.simkl.profileUrl} target="_blank" rel="noreferrer" className="underline inline-flex items-center gap-1 hover:text-yellow-300">Simkl <ExternalLink className="h-3 w-3" /></a>
-                        </p>
-                      </div>
-                    </div>
-                    <div className="bg-[#06080a] px-4 py-2 border border-slate-850 rounded-xl text-center self-stretch sm:self-auto">
-                      <span className="text-[10px] text-slate-500 font-mono block">Estatísticas Totais</span>
-                      <strong className="text-base font-bold text-yellow-400">
-                        {(data.simkl.stats?.moviesCount || 0) + (data.simkl.stats?.showsCount || 0) + (data.simkl.stats?.animeCount || 0)} itens
-                      </strong>
-                    </div>
-                  </div>
-
-                  {/* Stats Summary Bento cards */}
-                  <div className="p-6 space-y-6">
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                      <div className="bg-[#06080a]/85 border border-slate-900/80 p-5 rounded-2xl text-center shadow-md">
-                        <span className="text-[10px] text-slate-500 font-mono uppercase block mb-1">Filmes</span>
-                        <strong className="text-2xl font-black font-display text-emerald-400">{data.simkl.stats?.moviesCount || 0}</strong>
-                        <p className="text-[10px] text-slate-500 mt-1">Filmes assistidos</p>
-                      </div>
-                      <div className="bg-[#06080a]/85 border border-slate-900/80 p-5 rounded-2xl text-center shadow-md">
-                        <span className="text-[10px] text-slate-500 font-mono uppercase block mb-1">Séries</span>
-                        <strong className="text-2xl font-black font-display text-blue-400">{data.simkl.stats?.showsCount || 0}</strong>
-                        <p className="text-[10px] text-slate-500 mt-1">Séries acompanhadas</p>
-                      </div>
-                      <div className="bg-[#06080a]/85 border border-slate-900/80 p-5 rounded-2xl text-center shadow-md">
-                        <span className="text-[10px] text-slate-500 font-mono uppercase block mb-1">Animes</span>
-                        <strong className="text-2xl font-black font-display text-yellow-400">{data.simkl.stats?.animeCount || 0}</strong>
-                        <p className="text-[10px] text-slate-500 mt-1">Animes salvos</p>
-                      </div>
-                    </div>
-
-                    {data.simkl.fallback && (
-                      <div className="bg-[#110d06] border border-amber-950 p-4 rounded-xl text-amber-300 text-xs flex items-start gap-3 leading-relaxed">
-                        <AlertCircle className="h-5 w-5 shrink-0 mt-0.5 text-amber-500" />
-                        <div>
-                          <strong className="block mb-0.5">Sincronização Integrada Ativa</strong>
-                          O Simkl requer credenciais de desenvolvedor para a API oficial. Atualmente, exibimos estatísticas simuladas otimizadas com link de perfil direto. Estamos trabalhando em scrapers e integrações nativas de feed!
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Curated list / custom drama log */}
-                    <div className="border border-slate-900 rounded-2xl bg-[#06080a]/50 p-6 space-y-4">
-                      <h4 className="text-xs font-mono font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
-                        <Sparkles className="h-4 w-4 text-yellow-400" />
-                        Itens Recentes no Feed de Sincronização
-                      </h4>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {data.simkl.items?.map((item: any, i: number) => (
-                          <div key={i} className="bg-slate-950/80 border border-slate-900/60 p-4 rounded-xl flex items-center gap-4 hover:border-yellow-500/30 transition-all group overflow-hidden">
-                            {item.bannerUrl && (
-                              <img 
-                                src={item.bannerUrl} 
-                                alt={item.title} 
-                                className="h-16 w-12 rounded object-cover border border-slate-800 shadow shrink-0"
-                              />
-                            )}
-                            <div className="min-w-0 flex-1">
-                              <div className="flex justify-between items-start gap-2">
-                                <h5 className="font-bold text-slate-200 text-sm group-hover:text-yellow-400 transition-colors truncate">{item.title}</h5>
-                                <span className="text-[10px] font-mono font-bold bg-yellow-500/10 text-yellow-400 px-1.5 py-0.5 rounded border border-yellow-500/20 shrink-0">★ {item.rating}/10</span>
-                              </div>
-                              <p className="text-[10px] text-slate-500 mt-0.5 font-mono uppercase">{item.type} • {item.year}</p>
-                              <span className="inline-block text-[9px] font-mono bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-1.5 py-0.5 rounded-full mt-2">
-                                {item.status}
-                              </span>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </motion.div>
+              <SimklDetail data={data.simkl} />
             ) : (
               renderConnectOnboarding("simkl")
             )

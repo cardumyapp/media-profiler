@@ -5,4 +5,5 @@
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-display: "Outfit", sans-serif;
   --font-mono: "Fira Code", ui-monospace, SFMono-Regular, monospace;
+  --color-border: var(--color-slate-900);
 }

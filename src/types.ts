@@ -164,16 +164,25 @@ export interface SerializdItem {
   bannerUrl: string | null;
 }
 
+export interface SerializdFavoriteShow {
+  showId: number;
+  showName: string;
+  bannerImage: string | null;
+}
+
 export interface SerializdUser {
   username: string;
   biography: string;
   profilePicture: string | null;
+  joinedOn?: string;
   stats: {
     reviewsCount: number;
     followersCount: number;
     followingCount: number;
     showsCount: number;
+    watchlistCount?: number;
   };
+  favoriteShows?: SerializdFavoriteShow[];
   items: SerializdItem[];
 }
 
@@ -207,6 +216,7 @@ export interface LastFMUser {
   topTracks?: LastFMItem[];
   topArtists?: LastFMItem[];
   recommendedTracks?: LastFMItem[];
+  fallback?: boolean;
 }
 
 export interface MyDramaListUser {
